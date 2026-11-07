@@ -13,7 +13,7 @@ jobs:
           java-version: 25
       - uses: gradle/actions/setup-gradle@v4
       - run: bash gradlew projects --console=plain
-      - run: bash gradlew :1.20.1:forge:build --console=plain
+      - run: bash gradlew :1.20.1:build --console=plain
       - uses: actions/upload-artifact@v4
         with:
           name: jars
