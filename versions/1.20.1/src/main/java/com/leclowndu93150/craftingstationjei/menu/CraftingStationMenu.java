@@ -292,16 +292,34 @@ public class CraftingStationMenu extends AbstractContainerMenu {
         }
     }
 
+    private boolean gridDirty;
+
+    // Every grid write used to run a full recipe lookup, so a craft (up to nine removals) or an EMI fill (clear plus up to nine
+    // sets) cost up to ~10 lookups on the server thread. The grid now only marks itself dirty and is resolved once, before a click
+    // is processed and before the menu is broadcast.
     @Override
     public void slotsChanged(Container inventory) {
         if (inventory == craftMatrix) {
-            craftMatrix.setDoNotCallUpdates(true);
-            try {
-                slotChangedCraftingGrid();
-            } finally {
-                craftMatrix.setDoNotCallUpdates(false);
+            if (world.isClientSide) {
+                resolveCraftingGrid();
+            } else {
+                gridDirty = true;
             }
         }
+    }
+
+    private void resolveCraftingGrid() {
+        gridDirty = false;
+        craftMatrix.setDoNotCallUpdates(true);
+        try {
+            slotChangedCraftingGrid();
+        } finally {
+            craftMatrix.setDoNotCallUpdates(false);
+        }
+    }
+
+    public void flushCraftingGrid() {
+        if (gridDirty) resolveCraftingGrid();
     }
 
     private void slotChangedCraftingGrid() {
@@ -412,6 +430,7 @@ public class CraftingStationMenu extends AbstractContainerMenu {
 
     @Override
     public void clicked(int slotId, int button, ClickType clickType, Player player) {
+        flushCraftingGrid();
         if (clickType == ClickType.SWAP && (button >= 0 && button < 9 || button == 40)
                 && slotId >= 0 && slotId < slots.size()
                 && slots.get(slotId) instanceof SideContainerSlot sideSlot) {
@@ -419,6 +438,7 @@ public class CraftingStationMenu extends AbstractContainerMenu {
             return;
         }
         super.clicked(slotId, button, clickType, player);
+        flushCraftingGrid();
     }
 
     private void swapWithSideSlot(SideContainerSlot sideSlot, int button, Player player) {
@@ -578,6 +598,7 @@ public class CraftingStationMenu extends AbstractContainerMenu {
 
     @Override
     public void broadcastChanges() {
+        flushCraftingGrid();
         super.broadcastChanges();
         if (hasSideContainers()) {
             syncSideContainers();
